@@ -47,11 +47,14 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
+          SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION }}
         run: |
           mvn --batch-mode verify sonar:sonar \
             -Psonar \
-            -Dsonar.projectKey=saga-design-pattern \
-            -Dsonar.host.url=$SONAR_HOST_URL \
+            -Dsonar.projectKey=${SONAR_PROJECT_KEY:-saga-design-pattern} \
+            -Dsonar.organization=${SONAR_ORGANIZATION} \
+            -Dsonar.host.url=${SONAR_HOST_URL:-https://sonarcloud.io} \
             -Dsonar.token=$SONAR_TOKEN
 
       # ── 6. Upload JaCoCo coverage reports as build artifacts ───────
