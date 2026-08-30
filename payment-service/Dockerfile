@@ -21,7 +21,9 @@ COPY shipping-service/pom.xml shipping-service/pom.xml
 COPY choreography-commons/pom.xml choreography-commons/pom.xml
 COPY choreography-service/pom.xml choreography-service/pom.xml
 
-# Build saga-commons first, then payment-service
+# Install parent POM into local .m2 so child modules can resolve it
+RUN mvn -N install -DskipTests --no-transfer-progress
+# Build saga-commons, then payment-service
 RUN mvn -pl saga-commons install -DskipTests --no-transfer-progress
 RUN mvn -pl payment-service package -DskipTests --no-transfer-progress
 

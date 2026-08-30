@@ -21,7 +21,9 @@ COPY payment-service/pom.xml payment-service/pom.xml
 COPY inventory-service/pom.xml inventory-service/pom.xml
 COPY shipping-service/pom.xml shipping-service/pom.xml
 
-# Build choreography-commons first, then choreography-service (skip tests in image build)
+# Install parent POM into local .m2 so child modules can resolve it
+RUN mvn -N install -DskipTests --no-transfer-progress
+# Build choreography-commons, then choreography-service
 RUN mvn -pl choreography-commons install -DskipTests --no-transfer-progress
 RUN mvn -pl choreography-service package -DskipTests --no-transfer-progress
 
