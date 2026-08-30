@@ -34,9 +34,9 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <!-- ── SonarQube ─────────────────────────────────────── -->
-        <sonar.projectKey>saga-design-pattern</sonar.projectKey>
+        <!-- projectKey and host.url are passed via -D flags in CI (sonar.yml) -->
+        <!-- Do NOT hardcode them here — it would override CI secrets           -->
         <sonar.projectName>SAGA Design Pattern</sonar.projectName>
-        <sonar.host.url>http://localhost:9000</sonar.host.url>
         <sonar.java.coveragePlugin>jacoco</sonar.java.coveragePlugin>
         <sonar.coverage.jacoco.xmlReportPaths>
             ${project.build.directory}/site/jacoco/jacoco.xml
@@ -115,8 +115,9 @@
                 <plugins>
                     <plugin>
                         <groupId>org.sonarsource.scanner.maven</groupId>
-                        <artifactId>sonar-maven-plugin</artifactId>
-                        <version>3.10.0.2594</version>
+                            <artifactId>sonar-maven-plugin</artifactId>
+                            <!-- 4.x requires Java 21 scanner JVM — matches our CI setup -->
+                            <version>4.0.0.4121</version>
                         <executions>
                             <execution>
                                 <id>sonar</id>
