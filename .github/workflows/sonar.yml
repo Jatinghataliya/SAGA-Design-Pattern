@@ -322,3 +322,274 @@ jobs:
       - name: Stop all services
         if: always()
         run: docker compose down -v
+
+  # ── Job 6: Publish to GHCR (Continuous Delivery — main branch only) ──────
+  publish:
+    name: Publish to GHCR
+    runs-on: ubuntu-latest
+    needs: integration-tests
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    permissions:
+      contents: read
+      packages: write   # required to push to GHCR
+
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Short SHA used as immutable image tag (e.g. ghcr.io/jatinghataliya/saga-order-service:abc1234)
+      - name: Set image tag
+        run: echo "SHA_TAG=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+
+      - name: Publish order-service
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: order-service/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/saga-order-service:latest
+            ${{ env.IMAGE_PREFIX }}/saga-order-service:${{ env.SHA_TAG }}
+          cache-from: type=gha,scope=order-service
+          cache-to: type=gha,mode=max,scope=order-service
+
+      - name: Publish payment-service
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: payment-service/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/saga-payment-service:latest
+            ${{ env.IMAGE_PREFIX }}/saga-payment-service:${{ env.SHA_TAG }}
+          cache-from: type=gha,scope=payment-service
+          cache-to: type=gha,mode=max,scope=payment-service
+
+      - name: Publish inventory-service
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: inventory-service/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/saga-inventory-service:latest
+            ${{ env.IMAGE_PREFIX }}/saga-inventory-service:${{ env.SHA_TAG }}
+          cache-from: type=gha,scope=inventory-service
+          cache-to: type=gha,mode=max,scope=inventory-service
+
+      - name: Publish shipping-service
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: shipping-service/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/saga-shipping-service:latest
+            ${{ env.IMAGE_PREFIX }}/saga-shipping-service:${{ env.SHA_TAG }}
+          cache-from: type=gha,scope=shipping-service
+          cache-to: type=gha,mode=max,scope=shipping-service
+
+      - name: Publish choreography-service
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: choreography-service/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/saga-choreography-service:latest
+            ${{ env.IMAGE_PREFIX }}/saga-choreography-service:${{ env.SHA_TAG }}
+          cache-from: type=gha,scope=choreography-service
+          cache-to: type=gha,mode=max,scope=choreography-service
+
+      - name: Print published image tags
+        run: |
+          echo "Published images:"
+          echo "  ghcr.io/${{ github.repository_owner }}/saga-order-service:${{ env.SHA_TAG }}"
+          echo "  ghcr.io/${{ github.repository_owner }}/saga-payment-service:${{ env.SHA_TAG }}"
+          echo "  ghcr.io/${{ github.repository_owner }}/saga-inventory-service:${{ env.SHA_TAG }}"
+          echo "  ghcr.io/${{ github.repository_owner }}/saga-shipping-service:${{ env.SHA_TAG }}"
+          echo "  ghcr.io/${{ github.repository_owner }}/saga-choreography-service:${{ env.SHA_TAG }}"
+
+  # ── Job 7: GitHub Release (auto changelog — main branch only) ────────────
+  release:
+    name: GitHub Release
+    runs-on: ubuntu-latest
+    needs: publish
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    permissions:
+      contents: write   # required to create a GitHub Release
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set release version
+        run: |
+          echo "SHA_TAG=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+          echo "RELEASE_NAME=release-${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+
+      - name: Generate release notes from commits
+        run: |
+          # Get commits since last tag (or all if no tag exists)
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -n "$LAST_TAG" ]; then
+            COMMITS=$(git log "$LAST_TAG"..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          else
+            COMMITS=$(git log HEAD --pretty=format:"- %s (%h)" --no-merges | head -20)
+          fi
+
+          cat > release-notes.md << EOF
+          ## SAGA Design Pattern - ${{ env.RELEASE_NAME }}
+
+          ### Docker Images
+          Pull the images for this release:
+          \`\`\`bash
+          docker pull ghcr.io/${{ github.repository_owner }}/saga-order-service:${{ env.SHA_TAG }}
+          docker pull ghcr.io/${{ github.repository_owner }}/saga-payment-service:${{ env.SHA_TAG }}
+          docker pull ghcr.io/${{ github.repository_owner }}/saga-inventory-service:${{ env.SHA_TAG }}
+          docker pull ghcr.io/${{ github.repository_owner }}/saga-shipping-service:${{ env.SHA_TAG }}
+          docker pull ghcr.io/${{ github.repository_owner }}/saga-choreography-service:${{ env.SHA_TAG }}
+          \`\`\`
+
+          ### Changes
+          ${COMMITS}
+
+          ### Pipeline
+          - Build & Test: passed
+          - SonarQube: passed
+          - Trivy Vulnerability Scan: passed
+          - Docker Build Validation: passed
+          - Integration Tests: passed
+          - Published to GHCR: passed
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_NAME }}
+          name: ${{ env.RELEASE_NAME }}
+          body_path: release-notes.md
+          draft: false
+          prerelease: false
+
+  # ── Job 8: Deploy (Continuous Deployment — manual approval gate) ──────────
+  deploy:
+    name: Deploy to Environment
+    runs-on: ubuntu-latest
+    needs: publish
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    # This environment requires a manual approval in GitHub Settings
+    # Go to: Settings -> Environments -> New environment -> "production"
+    # Add a "Required reviewers" protection rule with your username
+    environment:
+      name: production
+      url: http://localhost:8080/actuator/health
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set image tag
+        run: echo "SHA_TAG=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+
+      # Update docker-compose to use the published GHCR images for this SHA
+      - name: Create production docker-compose override
+        run: |
+          cat > docker-compose.prod.yml << EOF
+          version: "3.9"
+          services:
+            order-service:
+              image: ghcr.io/${{ github.repository_owner }}/saga-order-service:${{ env.SHA_TAG }}
+            payment-service:
+              image: ghcr.io/${{ github.repository_owner }}/saga-payment-service:${{ env.SHA_TAG }}
+            inventory-service:
+              image: ghcr.io/${{ github.repository_owner }}/saga-inventory-service:${{ env.SHA_TAG }}
+            shipping-service:
+              image: ghcr.io/${{ github.repository_owner }}/saga-shipping-service:${{ env.SHA_TAG }}
+            choreography-service:
+              image: ghcr.io/${{ github.repository_owner }}/saga-choreography-service:${{ env.SHA_TAG }}
+          EOF
+
+      # ── Option A: Deploy via SSH to a remote server ──────────────────────
+      # Uncomment and set SERVER_HOST, SSH_PRIVATE_KEY secrets to use this
+      # - name: Deploy to remote server via SSH
+      #   uses: appleboy/ssh-action@v1.2.0
+      #   with:
+      #     host: ${{ secrets.SERVER_HOST }}
+      #     username: ${{ secrets.SERVER_USER }}
+      #     key: ${{ secrets.SSH_PRIVATE_KEY }}
+      #     script: |
+      #       cd /opt/saga-design-pattern
+      #       docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+      #       docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d \
+      #         order-service payment-service inventory-service shipping-service choreography-service
+      #       docker compose ps
+
+      # ── Option B: Smoke test the GHCR images locally in CI ───────────────
+      - name: Log in to GHCR to pull published images
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull and start services from GHCR
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d \
+            payment-service inventory-service shipping-service order-service
+
+      - name: Wait for services to be healthy
+        run: |
+          for svc in payment-service inventory-service shipping-service order-service; do
+            echo "Waiting for $svc..."
+            timeout 300 bash -c "
+              until [ \"\$(docker inspect --format='{{.State.Health.Status}}' $svc 2>/dev/null)\" = 'healthy' ]; do
+                sleep 5
+              done
+            "
+            echo "$svc is healthy"
+          done
+
+      - name: Smoke test — happy path order
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST http://localhost:8080/orders \
+            -H "Content-Type: application/json" \
+            -d '{
+              "idempotencyKey": "deploy-smoke-test-001",
+              "customerId": "SMOKE-1",
+              "productId": "PROD-001",
+              "quantity": 1,
+              "amount": 50.00,
+              "shippingAddress": "Smoke Test Lane"
+            }')
+          STATUS=$(echo "$RESPONSE" | tail -n 1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          if [ "$STATUS" = "201" ] && echo "$BODY" | grep -q "COMPLETED"; then
+            echo "Smoke test PASSED — deployment is healthy"
+          else
+            echo "Smoke test FAILED — HTTP $STATUS: $BODY"
+            exit 1
+          fi
+
+      - name: Stop services
+        if: always()
+        run: docker compose -f docker-compose.yml -f docker-compose.prod.yml down -v
