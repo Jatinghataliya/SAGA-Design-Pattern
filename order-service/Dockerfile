@@ -14,6 +14,14 @@ COPY saga-commons/src saga-commons/src
 COPY order-service/pom.xml order-service/pom.xml
 COPY order-service/src order-service/src
 
+# Stub out sibling modules so parent POM validation passes
+# (parent pom.xml lists all modules; Docker only copies 2 of them)
+COPY payment-service/pom.xml payment-service/pom.xml
+COPY inventory-service/pom.xml inventory-service/pom.xml
+COPY shipping-service/pom.xml shipping-service/pom.xml
+COPY choreography-commons/pom.xml choreography-commons/pom.xml
+COPY choreography-service/pom.xml choreography-service/pom.xml
+
 # Build saga-commons first, then order-service (skip tests in image build)
 RUN mvn -pl saga-commons install -DskipTests --no-transfer-progress
 RUN mvn -pl order-service package -DskipTests --no-transfer-progress

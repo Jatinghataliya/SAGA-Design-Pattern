@@ -14,6 +14,13 @@ COPY choreography-commons/src choreography-commons/src
 COPY choreography-service/pom.xml choreography-service/pom.xml
 COPY choreography-service/src choreography-service/src
 
+# Stub out sibling modules so parent POM validation passes
+COPY saga-commons/pom.xml saga-commons/pom.xml
+COPY order-service/pom.xml order-service/pom.xml
+COPY payment-service/pom.xml payment-service/pom.xml
+COPY inventory-service/pom.xml inventory-service/pom.xml
+COPY shipping-service/pom.xml shipping-service/pom.xml
+
 # Build choreography-commons first, then choreography-service (skip tests in image build)
 RUN mvn -pl choreography-commons install -DskipTests --no-transfer-progress
 RUN mvn -pl choreography-service package -DskipTests --no-transfer-progress
