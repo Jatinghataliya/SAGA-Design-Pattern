@@ -116,7 +116,7 @@ jobs:
       # Scan the repo filesystem for CVEs in pom.xml dependencies
       # CRITICAL severity only — fails build; HIGH produces warnings only
       - name: Run Trivy filesystem scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -128,7 +128,7 @@ jobs:
 
       # Also produce a full SARIF report (uploaded to GitHub Security tab)
       - name: Run Trivy SARIF report
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         if: always()
         with:
           scan-type: fs
