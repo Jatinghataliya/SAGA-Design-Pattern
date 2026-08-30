@@ -15,7 +15,9 @@ import java.time.LocalDateTime;
  * its `sagaStatus` field tracks exactly which step of the saga we are in.
  */
 @Entity
-@Table(name = "orders")
+@Table(name = "orders", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_orders_idempotency_key", columnNames = "idempotency_key")
+})
 @Data
 @Builder
 @NoArgsConstructor
@@ -25,6 +27,14 @@ public class Order {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
+
+    /**
+     * Optional client-supplied idempotency key.
+     * Stored with a UNIQUE constraint so a second request with the same key
+     * can never create a second Order row or trigger a second SAGA.
+     */
+    @Column(name = "idempotency_key", unique = true)
+    private String idempotencyKey;
 
     @Column(nullable = false)
     private String customerId;

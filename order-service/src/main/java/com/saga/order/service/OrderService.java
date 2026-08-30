@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -24,12 +25,28 @@ public class OrderService {
 
     /**
      * Creates an order and hands it off to the SAGA orchestrator.
-     * The orchestrator drives the distributed transaction.
+     *
+     * IDEMPOTENCY: if the caller supplies an idempotencyKey and we already have
+     * an Order row for that key, we return the existing order immediately without
+     * starting a new SAGA or charging the customer a second time.
      */
     @Transactional
     public OrderResponse createOrder(OrderRequest request) {
+
+        // ── Idempotency check ────────────────────────────────────────────────
+        if (request.getIdempotencyKey() != null && !request.getIdempotencyKey().isBlank()) {
+            Optional<Order> existing = orderRepository.findByIdempotencyKey(request.getIdempotencyKey());
+            if (existing.isPresent()) {
+                log.info("[IDEMPOTENT] Duplicate request for idempotencyKey={}. Returning existing orderId={}",
+                        request.getIdempotencyKey(), existing.get().getId());
+                return toResponse(existing.get());
+            }
+        }
+        // ────────────────────────────────────────────────────────────────────
+
         // Persist the order in PENDING state before starting the saga
         Order order = Order.builder()
+                .idempotencyKey(request.getIdempotencyKey())
                 .customerId(request.getCustomerId())
                 .productId(request.getProductId())
                 .quantity(request.getQuantity())

@@ -29,6 +29,25 @@ public class InventoryService {
         log.info("Reserving inventory for orderId={} productId={} qty={}",
                 request.getOrderId(), request.getProductId(), request.getQuantity());
 
+        // ── Idempotency guard ────────────────────────────────────────────────
+        // orderId has a UNIQUE constraint — if a reservation already exists for
+        // this order, return it directly without deducting stock again.
+        var existing = reservationRepository.findByOrderId(request.getOrderId());
+        if (existing.isPresent()) {
+            InventoryReservation r = existing.get();
+            log.info("[IDEMPOTENT] Reservation already exists for orderId={}. Returning reservationId={} status={}",
+                    request.getOrderId(), r.getId(), r.getStatus());
+            return InventoryResponse.builder()
+                    .reservationId(r.getId())
+                    .orderId(r.getOrderId())
+                    .productId(r.getProductId())
+                    .quantity(r.getQuantity())
+                    .status(r.getStatus())
+                    .message("[IDEMPOTENT] Returning existing reservation result")
+                    .build();
+        }
+        // ────────────────────────────────────────────────────────────────────
+
         ProductStock stock = stockRepository.findById(request.getProductId()).orElse(null);
 
         if (stock == null || stock.getAvailableQuantity() < request.getQuantity()) {

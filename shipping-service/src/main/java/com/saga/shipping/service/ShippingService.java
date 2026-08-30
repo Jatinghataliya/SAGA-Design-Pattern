@@ -31,6 +31,24 @@ public class ShippingService {
         log.info("Scheduling shipment for orderId={} address={}",
                 request.getOrderId(), request.getShippingAddress());
 
+        // ── Idempotency guard ────────────────────────────────────────────────
+        // orderId has a UNIQUE constraint — if a shipment already exists for
+        // this order, return it directly without scheduling again.
+        var existing = shipmentRepository.findByOrderId(request.getOrderId());
+        if (existing.isPresent()) {
+            Shipment s = existing.get();
+            log.info("[IDEMPOTENT] Shipment already exists for orderId={}. Returning shipmentId={} status={}",
+                    request.getOrderId(), s.getId(), s.getStatus());
+            return ShippingResponse.builder()
+                    .shipmentId(s.getId())
+                    .orderId(s.getOrderId())
+                    .trackingNumber(s.getTrackingNumber())
+                    .status(s.getStatus())
+                    .message("[IDEMPOTENT] Returning existing shipment result")
+                    .build();
+        }
+        // ────────────────────────────────────────────────────────────────────
+
         if (request.getShippingAddress() != null &&
                 request.getShippingAddress().toUpperCase().contains(BLOCKED_ADDRESS)) {
             log.warn("Shipping FAILED — address is blocked: {}", request.getShippingAddress());

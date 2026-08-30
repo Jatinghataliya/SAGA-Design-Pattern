@@ -30,6 +30,24 @@ public class PaymentService {
     public PaymentResponse processPayment(PaymentRequest request) {
         log.info("Processing payment for orderId={} amount={}", request.getOrderId(), request.getAmount());
 
+        // ── Idempotency guard ────────────────────────────────────────────────
+        // orderId has a UNIQUE constraint — if a payment already exists for this
+        // order, return it directly without charging the customer again.
+        var existing = paymentRepository.findByOrderId(request.getOrderId());
+        if (existing.isPresent()) {
+            Payment p = existing.get();
+            log.info("[IDEMPOTENT] Payment already exists for orderId={}. Returning paymentId={} status={}",
+                    request.getOrderId(), p.getId(), p.getStatus());
+            return PaymentResponse.builder()
+                    .paymentId(p.getId())
+                    .orderId(p.getOrderId())
+                    .amount(p.getAmount())
+                    .status(p.getStatus())
+                    .message("[IDEMPOTENT] Returning existing payment result")
+                    .build();
+        }
+        // ────────────────────────────────────────────────────────────────────
+
         if (request.getAmount().compareTo(CREDIT_LIMIT) > 0) {
             log.warn("Payment DECLINED — amount {} exceeds credit limit {}", request.getAmount(), CREDIT_LIMIT);
             Payment payment = Payment.builder()
