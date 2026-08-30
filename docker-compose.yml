@@ -7,6 +7,7 @@ services:
     build:
       context: .
       dockerfile: payment-service/Dockerfile
+    image: saga/payment-service:ci
     container_name: payment-service
     ports:
       - "8081:8081"
@@ -25,6 +26,7 @@ services:
     build:
       context: .
       dockerfile: inventory-service/Dockerfile
+    image: saga/inventory-service:ci
     container_name: inventory-service
     ports:
       - "8082:8082"
@@ -43,6 +45,7 @@ services:
     build:
       context: .
       dockerfile: shipping-service/Dockerfile
+    image: saga/shipping-service:ci
     container_name: shipping-service
     ports:
       - "8083:8083"
@@ -61,6 +64,7 @@ services:
     build:
       context: .
       dockerfile: choreography-service/Dockerfile
+    image: saga/choreography-service:ci
     container_name: choreography-service
     ports:
       - "8090:8090"
@@ -119,6 +123,7 @@ services:
     build:
       context: .
       dockerfile: order-service/Dockerfile
+    image: saga/order-service:ci
     container_name: order-service
     ports:
       - "8080:8080"

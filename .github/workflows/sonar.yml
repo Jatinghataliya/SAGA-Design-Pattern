@@ -7,7 +7,7 @@ on:
     branches: [ "main" ]
 
 jobs:
-  # ── Job 1: always runs — build + unit tests ──────────────────────────────
+  # ── Job 1: Build & Unit Tests ─────────────────────────────────────────────
   build-and-test:
     name: Build & Test
     runs-on: ubuntu-latest
@@ -32,7 +32,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-
 
-      - name: Build and run tests
+      - name: Build and run unit tests
         run: mvn --batch-mode verify
 
       - name: Upload JaCoCo coverage reports
@@ -40,17 +40,14 @@ jobs:
         if: always()
         with:
           name: jacoco-coverage-reports
-          path: |
-            **/target/site/jacoco/
+          path: '**/target/site/jacoco/'
           retention-days: 7
 
-  # ── Job 2: only runs when SONAR_TOKEN secret is configured ───────────────
+  # ── Job 2: SonarQube Analysis (JDK 21) ───────────────────────────────────
   sonar:
     name: SonarQube Analysis
     runs-on: ubuntu-latest
     needs: build-and-test
-    # GitHub does not allow secrets in if-expressions directly.
-    # We pass the token as an env var and check it in a "gate" step instead.
 
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -70,7 +67,6 @@ jobs:
           fetch-depth: 0
 
       # SonarCloud scanner requires Java 21+ (as of SonarCloud 13.x)
-      # Source code still targets Java 17 via maven.compiler.source in pom.xml
       - name: Set up JDK 21 (required by SonarCloud scanner)
         if: env.SKIP_SONAR != 'true'
         uses: actions/setup-java@v5
@@ -83,7 +79,6 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.m2/repository
-          # v2 suffix busts old cache that had sonar-maven-plugin 3.10 cached
           key: ${{ runner.os }}-maven-v2-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             ${{ runner.os }}-maven-v2-
@@ -95,13 +90,9 @@ jobs:
           SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
           SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION }}
         run: |
-          # Resolve host URL: prefer the secret, fall back to SonarCloud
           HOST="${SONAR_HOST_URL:-https://sonarcloud.io}"
           KEY="${SONAR_PROJECT_KEY:-Jatinghataliya_SAGA-Design-Pattern}"
-
-          # Print Java version to confirm JDK 21 is active
           java -version
-
           mvn --batch-mode verify sonar:sonar \
             -Psonar \
             -Dsonar.projectKey="${KEY}" \
@@ -109,3 +100,231 @@ jobs:
             -Dsonar.host.url="${HOST}" \
             -Dsonar.token="${SONAR_TOKEN}" \
             -Dsonar.scanner.javaExePath="${JAVA_HOME}/bin/java"
+
+  # ── Job 3: OWASP Dependency Vulnerability Scan (parallel) ────────────────
+  owasp-scan:
+    name: OWASP Dependency Scan
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      # NVD database is ~300 MB — cache it keyed by week so it refreshes weekly
+      - name: Cache OWASP NVD database
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/owasp
+          key: ${{ runner.os }}-owasp-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-owasp-
+
+      - name: Run OWASP Dependency-Check
+        # failBuildOnCVSS=9 = only fail on CRITICAL (score 9-10), not medium/low
+        run: |
+          mvn --batch-mode \
+            org.owasp:dependency-check-maven:9.0.9:aggregate \
+            -DfailBuildOnCVSS=9 \
+            -Dformats=HTML,JSON \
+            -DoutputDirectory=target/dependency-check-report \
+            -DnvdApiDelay=6000
+
+      - name: Upload OWASP vulnerability report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: owasp-dependency-check-report
+          path: target/dependency-check-report/
+          retention-days: 14
+
+  # ── Job 4: Docker Build Validation (parallel) ────────────────────────────
+  docker-build:
+    name: Docker Build Validation
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build order-service image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: order-service/Dockerfile
+          push: false
+          tags: saga/order-service:ci
+          cache-from: type=gha,scope=order-service
+          cache-to: type=gha,mode=max,scope=order-service
+
+      - name: Build payment-service image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: payment-service/Dockerfile
+          push: false
+          tags: saga/payment-service:ci
+          cache-from: type=gha,scope=payment-service
+          cache-to: type=gha,mode=max,scope=payment-service
+
+      - name: Build inventory-service image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: inventory-service/Dockerfile
+          push: false
+          tags: saga/inventory-service:ci
+          cache-from: type=gha,scope=inventory-service
+          cache-to: type=gha,mode=max,scope=inventory-service
+
+      - name: Build shipping-service image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: shipping-service/Dockerfile
+          push: false
+          tags: saga/shipping-service:ci
+          cache-from: type=gha,scope=shipping-service
+          cache-to: type=gha,mode=max,scope=shipping-service
+
+      - name: Build choreography-service image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: choreography-service/Dockerfile
+          push: false
+          tags: saga/choreography-service:ci
+          cache-from: type=gha,scope=choreography-service
+          cache-to: type=gha,mode=max,scope=choreography-service
+
+  # ── Job 5: Integration Tests (needs docker-build) ────────────────────────
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: docker-build
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Restore Docker layer cache so images don't rebuild from scratch
+      - name: Restore Docker layer cache - order-service
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: order-service/Dockerfile
+          push: false
+          load: true
+          tags: saga/order-service:ci
+          cache-from: type=gha,scope=order-service
+
+      - name: Restore Docker layer cache - payment-service
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: payment-service/Dockerfile
+          push: false
+          load: true
+          tags: saga/payment-service:ci
+          cache-from: type=gha,scope=payment-service
+
+      - name: Restore Docker layer cache - inventory-service
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: inventory-service/Dockerfile
+          push: false
+          load: true
+          tags: saga/inventory-service:ci
+          cache-from: type=gha,scope=inventory-service
+
+      - name: Restore Docker layer cache - shipping-service
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: shipping-service/Dockerfile
+          push: false
+          load: true
+          tags: saga/shipping-service:ci
+          cache-from: type=gha,scope=shipping-service
+
+      - name: Restore Docker layer cache - choreography-service
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: choreography-service/Dockerfile
+          push: false
+          load: true
+          tags: saga/choreography-service:ci
+          cache-from: type=gha,scope=choreography-service
+
+      - name: Start SAGA Orchestrator services
+        run: |
+          docker compose up -d \
+            payment-service \
+            inventory-service \
+            shipping-service \
+            order-service
+
+      - name: Wait for Orchestrator services to be healthy
+        run: |
+          for svc in payment-service inventory-service shipping-service order-service; do
+            echo "Waiting for $svc..."
+            timeout 120 bash -c "
+              until [ \"\$(docker inspect --format='{{.State.Health.Status}}' $svc 2>/dev/null)\" = 'healthy' ]; do
+                sleep 3
+              done
+            "
+            echo "$svc is healthy"
+          done
+
+      - name: Run Orchestrator integration tests
+        run: bash .github/scripts/integration-test.sh
+
+      - name: Start Choreography service
+        run: docker compose up -d choreography-service
+
+      - name: Wait for Choreography service to be healthy
+        run: |
+          timeout 120 bash -c "
+            until [ \"\$(docker inspect --format='{{.State.Health.Status}}' choreography-service 2>/dev/null)\" = 'healthy' ]; do
+              sleep 3
+            done
+          "
+          echo "choreography-service is healthy"
+
+      - name: Run Choreography integration tests
+        run: bash .github/scripts/integration-test-choreography.sh
+
+      - name: Dump container logs on failure
+        if: failure()
+        run: |
+          for svc in payment-service inventory-service shipping-service order-service choreography-service; do
+            echo "========== $svc logs =========="
+            docker logs "$svc" --tail 60 2>&1 || true
+          done
+
+      - name: Stop all services
+        if: always()
+        run: docker compose down -v
