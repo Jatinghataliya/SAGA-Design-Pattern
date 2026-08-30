@@ -16,10 +16,10 @@ services:
       SERVER_PORT: 8081
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health || exit 1"]
-      interval: 15s
+      interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 30s
+      retries: 15
+      start_period: 90s
 
   # ── Inventory Service ────────────────────────────────────
   inventory-service:
@@ -35,10 +35,10 @@ services:
       SERVER_PORT: 8082
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8082/actuator/health || exit 1"]
-      interval: 15s
+      interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 30s
+      retries: 15
+      start_period: 90s
 
   # ── Shipping Service ─────────────────────────────────────
   shipping-service:
@@ -54,10 +54,10 @@ services:
       SERVER_PORT: 8083
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8083/actuator/health || exit 1"]
-      interval: 15s
+      interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 30s
+      retries: 15
+      start_period: 90s
 
   # ── Choreography Service — all 4 choreography "services" in one JVM ──
   choreography-service:
@@ -73,10 +73,10 @@ services:
       SERVER_PORT: 8090
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8090/actuator/health || exit 1"]
-      interval: 15s
+      interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 30s
+      retries: 15
+      start_period: 90s
 
   # ── SonarQube ────────────────────────────────────────────
   sonarqube:
@@ -134,6 +134,12 @@ services:
       SERVICES_PAYMENT_URL: http://payment-service:8081
       SERVICES_INVENTORY_URL: http://inventory-service:8082
       SERVICES_SHIPPING_URL: http://shipping-service:8083
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 90s
     depends_on:
       payment-service:
         condition: service_healthy
