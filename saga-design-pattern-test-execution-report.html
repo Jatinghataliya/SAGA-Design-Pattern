@@ -1,0 +1,529 @@
+
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SAGA Design Pattern — Test Report</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    background: #ffffff;
+    color: #1f2328;
+    padding: 32px 16px 48px;
+  }
+  .page { max-width: 760px; margin: 0 auto; }
+
+  /* Header */
+  .report-header { border-bottom: 2px solid #e5e7eb; padding-bottom: 20px; margin-bottom: 28px; }
+  .report-header h1 { font-size: 22px; font-weight: 700; color: #1f2328; }
+  .report-header .subtitle { color: #57606a; font-size: 13px; margin-top: 4px; }
+  .meta-row { display: flex; gap: 24px; margin-top: 14px; flex-wrap: wrap; }
+  .meta-item { font-size: 12px; color: #57606a; }
+  .meta-item strong { color: #1f2328; }
+
+  /* Summary cards */
+  .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 32px; }
+  .card {
+    background: #f7f8fa;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 14px 16px;
+    text-align: center;
+  }
+  .card .num { font-size: 28px; font-weight: 700; line-height: 1; }
+  .card .lbl { font-size: 11px; color: #57606a; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 4px; }
+  .card.total .num { color: #1f2328; }
+  .card.pass  .num { color: #1a7f37; }
+  .card.fail  .num { color: #cf222e; }
+  .card.rate  .num { color: #3b82d4; }
+
+  /* Progress bar */
+  .progress-wrap { margin-bottom: 32px; }
+  .progress-wrap .label { font-size: 12px; color: #57606a; margin-bottom: 6px; display: flex; justify-content: space-between; }
+  .progress-bar { height: 10px; background: #e5e7eb; border-radius: 99px; overflow: hidden; }
+  .progress-fill { height: 100%; background: #1a7f37; border-radius: 99px; width: 100%; }
+
+  /* Section header */
+  .section-title {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #57606a;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 6px;
+    margin: 28px 0 14px;
+  }
+
+  /* Test suite table */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead tr { background: #f7f8fa; }
+  th { text-align: left; padding: 8px 12px; font-weight: 600; color: #57606a; border-bottom: 2px solid #e5e7eb; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+  td { padding: 9px 12px; border-bottom: 1px solid #f0f1f3; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #f7f8fa; }
+
+  /* Badges */
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 99px;
+    white-space: nowrap;
+  }
+  .badge-pass { background: #dafbe1; color: #116329; }
+  .badge-fail { background: #ffebe9; color: #a40e26; }
+  .badge-saga { background: #ddf4ff; color: #0550ae; font-weight: 500; }
+
+  /* Assertions list */
+  .assertions { list-style: none; padding: 0; margin: 0; }
+  .assertions li { font-size: 12px; color: #57606a; padding: 1px 0; }
+  .assertions li::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #1a7f37; margin-right: 6px; vertical-align: middle; }
+
+  /* Request snippet */
+  .snippet { font-family: "Consolas", "Courier New", monospace; font-size: 11px; background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 4px; padding: 6px 10px; color: #57606a; margin-top: 3px; }
+
+  /* Compensation flow */
+  .flow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+  .flow-step { font-size: 11px; background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 4px; padding: 2px 8px; color: #1f2328; }
+  .flow-arrow { font-size: 11px; color: #57606a; }
+  .flow-step.comp { background: #fff8c5; border-color: #d4a72c; color: #7d4e00; }
+
+  /* Service grid */
+  .service-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 8px; }
+  .service-card { display: flex; align-items: center; justify-content: space-between; background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px 14px; }
+  .service-card .svc-name { font-size: 13px; font-weight: 500; }
+  .service-card .svc-port { font-size: 12px; color: #57606a; font-family: monospace; }
+  .dot-up { width: 9px; height: 9px; background: #1a7f37; border-radius: 50%; display: inline-block; }
+
+  /* Footer */
+  footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 12px; color: #57606a; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  
+  <div class="report-header">
+    <h1>SAGA Design Pattern — Test Execution Report</h1>
+    <div class="subtitle">Orchestrator Pattern · Spring Boot 3 · Java 17 · 4 Microservices</div>
+    <div class="meta-row">
+      <div class="meta-item"><strong>Executed:</strong> 30 August 2026, 12:11 IST</div>
+      <div class="meta-item"><strong>Script:</strong> test-saga.ps1</div>
+      <div class="meta-item"><strong>Environment:</strong> Local (localhost)</div>
+      <div class="meta-item"><strong>Branch:</strong> main</div>
+    </div>
+  </div>
+
+  
+  <div class="summary">
+    <div class="card total"><div class="num">19</div><div class="lbl">Total Assertions</div></div>
+    <div class="card pass"><div class="num">19</div><div class="lbl">Passed</div></div>
+    <div class="card fail"><div class="num">0</div><div class="lbl">Failed</div></div>
+    <div class="card rate"><div class="num">100%</div><div class="lbl">Pass Rate</div></div>
+  </div>
+
+  
+  <div class="progress-wrap">
+    <div class="label"><span>Assertion Pass Rate</span><span>19 / 19</span></div>
+    <div class="progress-bar"><div class="progress-fill"></div></div>
+  </div>
+
+  
+  <div class="section-title">Services Health</div>
+  <div class="service-grid">
+    <div class="service-card">
+      <div><div class="svc-name">order-service <span style="font-size:11px;color:#57606a">(Orchestrator)</span></div><div class="svc-port">:8080  /actuator/health</div></div>
+      <span class="dot-up"></span>
+    </div>
+    <div class="service-card">
+      <div><div class="svc-name">payment-service</div><div class="svc-port">:8081  /actuator/health</div></div>
+      <span class="dot-up"></span>
+    </div>
+    <div class="service-card">
+      <div><div class="svc-name">inventory-service</div><div class="svc-port">:8082  /actuator/health</div></div>
+      <span class="dot-up"></span>
+    </div>
+    <div class="service-card">
+      <div><div class="svc-name">shipping-service</div><div class="svc-port">:8083  /actuator/health</div></div>
+      <span class="dot-up"></span>
+    </div>
+  </div>
+
+  
+  <div class="section-title">Test Suites</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:6%">#</th>
+        <th style="width:28%">Suite</th>
+        <th style="width:20%">SAGA Status</th>
+        <th style="width:28%">Assertions</th>
+        <th style="width:10%">Result</th>
+        <th style="width:8%">Count</th>
+      </tr>
+    </thead>
+    <tbody>
+
+      
+      <tr>
+        <td style="color:#57606a">1</td>
+        <td>
+          <strong>Health Checks</strong><br />
+          <span style="font-size:12px;color:#57606a">All 4 services reachable and UP</span>
+        </td>
+        <td><span class="badge badge-saga">Infrastructure</span></td>
+        <td>
+          <ul class="assertions">
+            <li>order-service :8080 status=UP</li>
+            <li>payment-service :8081 status=UP</li>
+            <li>inventory-service :8082 status=UP</li>
+            <li>shipping-service :8083 status=UP</li>
+          </ul>
+        </td>
+        <td><span class="badge badge-pass">PASS</span></td>
+        <td style="color:#57606a;text-align:center">4</td>
+      </tr>
+
+      
+      <tr>
+        <td style="color:#57606a">2</td>
+        <td>
+          <strong>Happy Path</strong><br />
+          <div class="snippet">PROD-001  qty=2  $199.99</div>
+          <div class="flow" style="margin-top:6px">
+            <span class="flow-step">Payment</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-step">Inventory</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-step">Shipping</span>
+          </div>
+        </td>
+        <td><span class="badge badge-saga">COMPLETED</span></td>
+        <td>
+          <ul class="assertions">
+            <li>SAGA status is COMPLETED</li>
+            <li>Response contains Shipment ID</li>
+          </ul>
+        </td>
+        <td><span class="badge badge-pass">PASS</span></td>
+        <td style="color:#57606a;text-align:center">2</td>
+      </tr>
+
+      
+      <tr>
+        <td style="color:#57606a">3</td>
+        <td>
+          <strong>Payment Failure</strong><br />
+          <div class="snippet">amount=$99,999 &gt; credit limit $10,000</div>
+          <div class="flow" style="margin-top:6px">
+            <span class="flow-step comp">Payment DECLINED</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-step">No compensation needed</span>
+          </div>
+        </td>
+        <td><span class="badge badge-saga">PAYMENT_FAILED</span></td>
+        <td>
+          <ul class="assertions">
+            <li>SAGA status is PAYMENT_FAILED</li>
+            <li>Message mentions credit limit</li>
+          </ul>
+        </td>
+        <td><span class="badge badge-pass">PASS</span></td>
+        <td style="color:#57606a;text-align:center">2</td>
+      </tr>
+
+      
+      <tr>
+        <td style="color:#57606a">4</td>
+        <td>
+          <strong>Inventory Failure (0 stock)</strong><br />
+          <div class="snippet">PROD-003  available=0  requested=1</div>
+          <div class="flow" style="margin-top:6px">
+            <span class="flow-step">Payment OK</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-step comp">Inventory FAILED</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-step comp">Refund Payment</span>
+          </div>
+        </td>
+        <td><span class="badge badge-saga">INVENTORY_FAILED</span></td>
+        <td>
+          <ul class="assertions">
+            <li>SAGA status is INVENTORY_FAILED</li>
+            <li>Message mentions insufficient stock</li>
+          </ul>
+        </td>
+        <td><span class="badge badge-pass">PASS</span></td>
+        <td style="color:#57606a;text-align:center">2</td>
+      </tr>
+
+      
+      <tr>
+        <td style="color:#57606a">5</td>
+        <td>
+          <strong>Partial Stock Failure</strong><br />
+          <div class="snippet">PROD-002  available=5  requested=10</div>
+          <div class="flow" style="margin-top:6px">
+            <span class="flow-step">Payment OK</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-step comp">Inventory FAILED</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-step comp">Refund Payment</span>
+          </div>
+        </td>
+        <td><span class="badge badge-saga">INVENTORY_FAILED</span></td>
+        <td>
+          <ul class="assertions">
+            <li>SAGA status is INVENTORY_FAILED (qty 10 &gt; available 5)</li>
+          </ul>
+        </td>
+        <td><span class="badge badge-pass">PASS</span></td>
+        <td style="color:#57606a;text-align:center">1</td>
+      </tr>
+
+      
+      <tr>
+        <td style="color:#57606a">6</td>
+        <td>
+          <strong>Shipping Failure + Full Compensation</strong><br />
+          <div class="snippet">address="BLOCKED ZONE"</div>
+          <div class="flow" style="margin-top:6px">
+            <span class="flow-step">Payment OK</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-step">Inventory OK</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-step comp">Shipping FAILED</span>
+          </div>
+          <div class="flow">
+            <span class="flow-step comp">Release Inventory</span>
+            <span class="flow-arrow">+</span>
+            <span class="flow-step comp">Refund Payment</span>
+          </div>
+        </td>
+        <td><span class="badge badge-saga">SHIPPING_FAILED</span></td>
+        <td>
+          <ul class="assertions">
+            <li>SAGA status is SHIPPING_FAILED</li>
+            <li>Message mentions shipping restriction</li>
+          </ul>
+        </td>
+        <td><span class="badge badge-pass">PASS</span></td>
+        <td style="color:#57606a;text-align:center">2</td>
+      </tr>
+
+      
+      <tr>
+        <td style="color:#57606a">7</td>
+        <td>
+          <strong>Idempotency — Duplicate Requests</strong><br />
+          <span style="font-size:12px;color:#57606a">Same idempotencyKey sent 3 times</span>
+          <div class="snippet">key=test-idem-key-38805  (3 calls)</div>
+        </td>
+        <td><span class="badge badge-saga">COMPLETED</span></td>
+        <td>
+          <ul class="assertions">
+            <li>All 3 calls return the same orderId</li>
+            <li>Status COMPLETED for all duplicate calls</li>
+          </ul>
+        </td>
+        <td><span class="badge badge-pass">PASS</span></td>
+        <td style="color:#57606a;text-align:center">2</td>
+      </tr>
+
+      
+      <tr>
+        <td style="color:#57606a">8</td>
+        <td>
+          <strong>No Idempotency Key</strong><br />
+          <span style="font-size:12px;color:#57606a">Two calls without key = two independent orders</span>
+        </td>
+        <td><span class="badge badge-saga">COMPLETED</span></td>
+        <td>
+          <ul class="assertions">
+            <li>Two distinct orderIds created</li>
+          </ul>
+        </td>
+        <td><span class="badge badge-pass">PASS</span></td>
+        <td style="color:#57606a;text-align:center">1</td>
+      </tr>
+
+      
+      <tr>
+        <td style="color:#57606a">9</td>
+        <td>
+          <strong>GET Order by ID</strong><br />
+          <div class="snippet">GET /orders/{id}</div>
+        </td>
+        <td><span class="badge badge-saga">COMPLETED</span></td>
+        <td>
+          <ul class="assertions">
+            <li>Correct orderId returned</li>
+            <li>Order status is COMPLETED</li>
+          </ul>
+        </td>
+        <td><span class="badge badge-pass">PASS</span></td>
+        <td style="color:#57606a;text-align:center">2</td>
+      </tr>
+
+      
+      <tr>
+        <td style="color:#57606a">10</td>
+        <td>
+          <strong>List All Orders</strong><br />
+          <div class="snippet">GET /orders</div>
+        </td>
+        <td><span class="badge badge-saga">Mixed</span></td>
+        <td>
+          <ul class="assertions">
+            <li>Returned 8 orders</li>
+          </ul>
+          <div style="margin-top:5px;font-size:11px;color:#57606a">Statuses observed: COMPLETED, INVENTORY_FAILED, PAYMENT_FAILED, SHIPPING_FAILED</div>
+        </td>
+        <td><span class="badge badge-pass">PASS</span></td>
+        <td style="color:#57606a;text-align:center">1</td>
+      </tr>
+
+    </tbody>
+  </table>
+
+  
+  <div class="section-title">SAGA State Coverage</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Status</th>
+        <th>Triggered By</th>
+        <th>Compensation Fired</th>
+        <th>Tested</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="badge badge-saga">COMPLETED</span></td>
+        <td>All 3 steps succeed</td>
+        <td>None</td>
+        <td><span class="badge badge-pass">Yes</span></td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-saga">PAYMENT_FAILED</span></td>
+        <td>Amount &gt; $10,000 credit limit</td>
+        <td>None</td>
+        <td><span class="badge badge-pass">Yes</span></td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-saga">INVENTORY_FAILED</span></td>
+        <td>0 stock (PROD-003) or qty &gt; available</td>
+        <td>Refund payment</td>
+        <td><span class="badge badge-pass">Yes</span></td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-saga">SHIPPING_FAILED</span></td>
+        <td>BLOCKED shipping address</td>
+        <td>Release inventory + Refund payment</td>
+        <td><span class="badge badge-pass">Yes</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  
+  <div class="section-title">Assertions per Suite</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Suite</th>
+        <th style="text-align:center">Assertions</th>
+        <th style="text-align:center">Passed</th>
+        <th style="text-align:center">Failed</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>TEST 1 — Health Checks</td><td style="text-align:center">4</td><td style="text-align:center;color:#1a7f37">4</td><td style="text-align:center">0</td></tr>
+      <tr><td>TEST 2 — Happy Path</td><td style="text-align:center">2</td><td style="text-align:center;color:#1a7f37">2</td><td style="text-align:center">0</td></tr>
+      <tr><td>TEST 3 — Payment Failure</td><td style="text-align:center">2</td><td style="text-align:center;color:#1a7f37">2</td><td style="text-align:center">0</td></tr>
+      <tr><td>TEST 4 — Inventory Failure (0 stock)</td><td style="text-align:center">2</td><td style="text-align:center;color:#1a7f37">2</td><td style="text-align:center">0</td></tr>
+      <tr><td>TEST 5 — Partial Stock Failure</td><td style="text-align:center">1</td><td style="text-align:center;color:#1a7f37">1</td><td style="text-align:center">0</td></tr>
+      <tr><td>TEST 6 — Shipping Failure + Compensation</td><td style="text-align:center">2</td><td style="text-align:center;color:#1a7f37">2</td><td style="text-align:center">0</td></tr>
+      <tr><td>TEST 7 — Idempotency (3x duplicate)</td><td style="text-align:center">2</td><td style="text-align:center;color:#1a7f37">2</td><td style="text-align:center">0</td></tr>
+      <tr><td>TEST 8 — No Idempotency Key</td><td style="text-align:center">1</td><td style="text-align:center;color:#1a7f37">1</td><td style="text-align:center">0</td></tr>
+      <tr><td>TEST 9 — GET Order by ID</td><td style="text-align:center">2</td><td style="text-align:center;color:#1a7f37">2</td><td style="text-align:center">0</td></tr>
+      <tr><td>TEST 10 — List All Orders</td><td style="text-align:center">1</td><td style="text-align:center;color:#1a7f37">1</td><td style="text-align:center">0</td></tr>
+      <tr style="font-weight:600;background:#f7f8fa">
+        <td>TOTAL</td>
+        <td style="text-align:center">19</td>
+        <td style="text-align:center;color:#1a7f37">19</td>
+        <td style="text-align:center">0</td>
+      </tr>
+    </tbody>
+  </table>
+
+  
+  <div class="section-title">Assertions per Suite (Chart)</div>
+  <svg xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;display:block;margin:0 auto 8px">
+    
+    <line x1="60" y1="20" x2="60" y2="165" stroke="#e5e7eb" stroke-width="1"></line>
+    <line x1="60" y1="165" x2="690" y2="165" stroke="#e5e7eb" stroke-width="1"></line>
+    <line x1="60" y1="125" x2="690" y2="125" stroke="#f0f1f3" stroke-width="1"></line>
+    <line x1="60" y1="85" x2="690" y2="85" stroke="#f0f1f3" stroke-width="1"></line>
+    <line x1="60" y1="45" x2="690" y2="45" stroke="#f0f1f3" stroke-width="1"></line>
+    
+    <text x="52" y="168" text-anchor="end" font-size="10" fill="#57606a">0</text>
+    <text x="52" y="128" text-anchor="end" font-size="10" fill="#57606a">1</text>
+    <text x="52" y="88" text-anchor="end" font-size="10" fill="#57606a">2</text>
+    <text x="52" y="48" text-anchor="end" font-size="10" fill="#57606a">4</text>
+    
+    
+    <rect x="68" y="45" width="40" height="120" rx="3" fill="#1a7f37" opacity="0.85"></rect>
+    
+    <rect x="130" y="105" width="40" height="60" rx="3" fill="#1a7f37" opacity="0.85"></rect>
+    
+    <rect x="192" y="105" width="40" height="60" rx="3" fill="#1a7f37" opacity="0.85"></rect>
+    
+    <rect x="254" y="105" width="40" height="60" rx="3" fill="#1a7f37" opacity="0.85"></rect>
+    
+    <rect x="316" y="135" width="40" height="30" rx="3" fill="#1a7f37" opacity="0.85"></rect>
+    
+    <rect x="378" y="105" width="40" height="60" rx="3" fill="#1a7f37" opacity="0.85"></rect>
+    
+    <rect x="440" y="105" width="40" height="60" rx="3" fill="#1a7f37" opacity="0.85"></rect>
+    
+    <rect x="502" y="135" width="40" height="30" rx="3" fill="#1a7f37" opacity="0.85"></rect>
+    
+    <rect x="564" y="105" width="40" height="60" rx="3" fill="#1a7f37" opacity="0.85"></rect>
+    
+    <rect x="626" y="135" width="40" height="30" rx="3" fill="#1a7f37" opacity="0.85"></rect>
+    
+    <text x="88" y="180" text-anchor="middle" font-size="9" fill="#57606a">T1</text>
+    <text x="150" y="180" text-anchor="middle" font-size="9" fill="#57606a">T2</text>
+    <text x="212" y="180" text-anchor="middle" font-size="9" fill="#57606a">T3</text>
+    <text x="274" y="180" text-anchor="middle" font-size="9" fill="#57606a">T4</text>
+    <text x="336" y="180" text-anchor="middle" font-size="9" fill="#57606a">T5</text>
+    <text x="398" y="180" text-anchor="middle" font-size="9" fill="#57606a">T6</text>
+    <text x="460" y="180" text-anchor="middle" font-size="9" fill="#57606a">T7</text>
+    <text x="522" y="180" text-anchor="middle" font-size="9" fill="#57606a">T8</text>
+    <text x="584" y="180" text-anchor="middle" font-size="9" fill="#57606a">T9</text>
+    <text x="646" y="180" text-anchor="middle" font-size="9" fill="#57606a">T10</text>
+    
+    <text x="88" y="41" text-anchor="middle" font-size="10" font-weight="600" fill="#1a7f37">4</text>
+    <text x="150" y="101" text-anchor="middle" font-size="10" font-weight="600" fill="#1a7f37">2</text>
+    <text x="212" y="101" text-anchor="middle" font-size="10" font-weight="600" fill="#1a7f37">2</text>
+    <text x="274" y="101" text-anchor="middle" font-size="10" font-weight="600" fill="#1a7f37">2</text>
+    <text x="336" y="131" text-anchor="middle" font-size="10" font-weight="600" fill="#1a7f37">1</text>
+    <text x="398" y="101" text-anchor="middle" font-size="10" font-weight="600" fill="#1a7f37">2</text>
+    <text x="460" y="101" text-anchor="middle" font-size="10" font-weight="600" fill="#1a7f37">2</text>
+    <text x="522" y="131" text-anchor="middle" font-size="10" font-weight="600" fill="#1a7f37">1</text>
+    <text x="584" y="101" text-anchor="middle" font-size="10" font-weight="600" fill="#1a7f37">2</text>
+    <text x="646" y="131" text-anchor="middle" font-size="10" font-weight="600" fill="#1a7f37">1</text>
+  </svg>
+  <div style="font-size:11px;color:#57606a;text-align:center;margin-bottom:4px">Assertions per test suite (all passed)</div>
+
+  
+  <footer>Made with IBM Bob</footer>
+
+</div>
+</body>
+</html>

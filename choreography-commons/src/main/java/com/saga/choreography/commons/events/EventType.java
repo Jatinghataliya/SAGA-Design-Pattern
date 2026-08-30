@@ -1,0 +1,15 @@
+package com.saga.choreography.commons.events;
+
+public enum EventType {
+    ORDER_CREATED,
+    PAYMENT_APPROVED,
+    PAYMENT_FAILED,
+    PAYMENT_REFUNDED,
+    INVENTORY_RESERVED,
+    INVENTORY_FAILED,
+    INVENTORY_RELEASED,
+    SHIPMENT_SCHEDULED,
+    SHIPMENT_FAILED,
+    ORDER_COMPLETED,
+    ORDER_FAILED
+}
