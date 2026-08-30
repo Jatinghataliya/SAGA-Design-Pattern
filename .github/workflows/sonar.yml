@@ -69,11 +69,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up JDK 17
+      # SonarCloud scanner requires Java 21+ (as of SonarCloud 13.x)
+      # Source code still targets Java 17 via maven.compiler.source in pom.xml
+      - name: Set up JDK 21 (required by SonarCloud scanner)
         if: env.SKIP_SONAR != 'true'
         uses: actions/setup-java@v5
         with:
-          java-version: '17'
+          java-version: '21'
           distribution: 'temurin'
 
       - name: Cache Maven packages
