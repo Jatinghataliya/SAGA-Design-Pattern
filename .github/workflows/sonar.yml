@@ -83,17 +83,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.m2/repository
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          # v2 suffix busts old cache that had sonar-maven-plugin 3.10 cached
+          key: ${{ runner.os }}-maven-v2-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
-            ${{ runner.os }}-maven-
-
-      - name: Cache SonarQube scanner data
-        if: env.SKIP_SONAR != 'true'
-        uses: actions/cache@v4
-        with:
-          path: ~/.sonar/cache
-          key: ${{ runner.os }}-sonar
-          restore-keys: ${{ runner.os }}-sonar
+            ${{ runner.os }}-maven-v2-
 
       - name: Analyze with SonarQube / SonarCloud
         if: env.SKIP_SONAR != 'true'
@@ -104,11 +97,15 @@ jobs:
         run: |
           # Resolve host URL: prefer the secret, fall back to SonarCloud
           HOST="${SONAR_HOST_URL:-https://sonarcloud.io}"
-          KEY="${SONAR_PROJECT_KEY:-saga-design-pattern}"
+          KEY="${SONAR_PROJECT_KEY:-Jatinghataliya_SAGA-Design-Pattern}"
+
+          # Print Java version to confirm JDK 21 is active
+          java -version
 
           mvn --batch-mode verify sonar:sonar \
             -Psonar \
             -Dsonar.projectKey="${KEY}" \
             -Dsonar.organization="${SONAR_ORGANIZATION}" \
             -Dsonar.host.url="${HOST}" \
-            -Dsonar.token="${SONAR_TOKEN}"
+            -Dsonar.token="${SONAR_TOKEN}" \
+            -Dsonar.scanner.javaExePath="${JAVA_HOME}/bin/java"
