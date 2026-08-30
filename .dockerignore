@@ -1,7 +1,12 @@
-target/
-*.class
-*.jar
-*.war
+**/target/
+**/*.class
+**/*.jar
+**/*.war
 .git/
 .gitignore
 *.md
+pipeline_log.txt
+saga-design-pattern-test-execution-report.html
+test-saga.ps1
+test-saga.sh
+test-choreography.ps1
