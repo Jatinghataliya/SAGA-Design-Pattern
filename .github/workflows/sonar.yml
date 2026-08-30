@@ -336,7 +336,6 @@ jobs:
 
     env:
       REGISTRY: ghcr.io
-      IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}
 
     steps:
       - name: Checkout repository
@@ -352,9 +351,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Short SHA used as immutable image tag (e.g. ghcr.io/jatinghataliya/saga-order-service:abc1234)
-      - name: Set image tag
-        run: echo "SHA_TAG=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+      # GHCR requires lowercase owner — github.repository_owner may have uppercase
+      - name: Set image tag and prefix
+        run: |
+          echo "SHA_TAG=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_PREFIX=ghcr.io/${OWNER}" >> "$GITHUB_ENV"
 
       - name: Publish order-service
         uses: docker/build-push-action@v6
@@ -419,11 +421,11 @@ jobs:
       - name: Print published image tags
         run: |
           echo "Published images:"
-          echo "  ghcr.io/${{ github.repository_owner }}/saga-order-service:${{ env.SHA_TAG }}"
-          echo "  ghcr.io/${{ github.repository_owner }}/saga-payment-service:${{ env.SHA_TAG }}"
-          echo "  ghcr.io/${{ github.repository_owner }}/saga-inventory-service:${{ env.SHA_TAG }}"
-          echo "  ghcr.io/${{ github.repository_owner }}/saga-shipping-service:${{ env.SHA_TAG }}"
-          echo "  ghcr.io/${{ github.repository_owner }}/saga-choreography-service:${{ env.SHA_TAG }}"
+          echo "  ${{ env.IMAGE_PREFIX }}/saga-order-service:${{ env.SHA_TAG }}"
+          echo "  ${{ env.IMAGE_PREFIX }}/saga-payment-service:${{ env.SHA_TAG }}"
+          echo "  ${{ env.IMAGE_PREFIX }}/saga-inventory-service:${{ env.SHA_TAG }}"
+          echo "  ${{ env.IMAGE_PREFIX }}/saga-shipping-service:${{ env.SHA_TAG }}"
+          echo "  ${{ env.IMAGE_PREFIX }}/saga-choreography-service:${{ env.SHA_TAG }}"
 
   # ── Job 7: GitHub Release (auto changelog — main branch only) ────────────
   release:
@@ -445,6 +447,8 @@ jobs:
         run: |
           echo "SHA_TAG=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
           echo "RELEASE_NAME=release-${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_PREFIX=ghcr.io/${OWNER}" >> "$GITHUB_ENV"
 
       - name: Generate release notes from commits
         run: |
@@ -462,11 +466,11 @@ jobs:
           ### Docker Images
           Pull the images for this release:
           \`\`\`bash
-          docker pull ghcr.io/${{ github.repository_owner }}/saga-order-service:${{ env.SHA_TAG }}
-          docker pull ghcr.io/${{ github.repository_owner }}/saga-payment-service:${{ env.SHA_TAG }}
-          docker pull ghcr.io/${{ github.repository_owner }}/saga-inventory-service:${{ env.SHA_TAG }}
-          docker pull ghcr.io/${{ github.repository_owner }}/saga-shipping-service:${{ env.SHA_TAG }}
-          docker pull ghcr.io/${{ github.repository_owner }}/saga-choreography-service:${{ env.SHA_TAG }}
+          docker pull ${{ env.IMAGE_PREFIX }}/saga-order-service:${{ env.SHA_TAG }}
+          docker pull ${{ env.IMAGE_PREFIX }}/saga-payment-service:${{ env.SHA_TAG }}
+          docker pull ${{ env.IMAGE_PREFIX }}/saga-inventory-service:${{ env.SHA_TAG }}
+          docker pull ${{ env.IMAGE_PREFIX }}/saga-shipping-service:${{ env.SHA_TAG }}
+          docker pull ${{ env.IMAGE_PREFIX }}/saga-choreography-service:${{ env.SHA_TAG }}
           \`\`\`
 
           ### Changes
@@ -509,7 +513,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set image tag
-        run: echo "SHA_TAG=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+        run: |
+          echo "SHA_TAG=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_PREFIX=ghcr.io/${OWNER}" >> "$GITHUB_ENV"
 
       # Update docker-compose to use the published GHCR images for this SHA
       - name: Create production docker-compose override
@@ -518,15 +525,15 @@ jobs:
           version: "3.9"
           services:
             order-service:
-              image: ghcr.io/${{ github.repository_owner }}/saga-order-service:${{ env.SHA_TAG }}
+              image: ${{ env.IMAGE_PREFIX }}/saga-order-service:${{ env.SHA_TAG }}
             payment-service:
-              image: ghcr.io/${{ github.repository_owner }}/saga-payment-service:${{ env.SHA_TAG }}
+              image: ${{ env.IMAGE_PREFIX }}/saga-payment-service:${{ env.SHA_TAG }}
             inventory-service:
-              image: ghcr.io/${{ github.repository_owner }}/saga-inventory-service:${{ env.SHA_TAG }}
+              image: ${{ env.IMAGE_PREFIX }}/saga-inventory-service:${{ env.SHA_TAG }}
             shipping-service:
-              image: ghcr.io/${{ github.repository_owner }}/saga-shipping-service:${{ env.SHA_TAG }}
+              image: ${{ env.IMAGE_PREFIX }}/saga-shipping-service:${{ env.SHA_TAG }}
             choreography-service:
-              image: ghcr.io/${{ github.repository_owner }}/saga-choreography-service:${{ env.SHA_TAG }}
+              image: ${{ env.IMAGE_PREFIX }}/saga-choreography-service:${{ env.SHA_TAG }}
           EOF
 
       # ── Option A: Deploy via SSH to a remote server ──────────────────────
