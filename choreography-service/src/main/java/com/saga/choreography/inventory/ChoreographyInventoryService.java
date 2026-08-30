@@ -5,7 +5,8 @@ import com.saga.choreography.commons.events.*;
 import com.saga.choreography.order.ChoreographyOrderRepository;
 import com.saga.choreography.order.ChoreographyOrderStatus;
 import jakarta.annotation.PostConstruct;
-import org.springframework.context.event.EventListener;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,7 +39,7 @@ public class ChoreographyInventoryService {
         }
     }
 
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onPaymentApproved(PaymentApprovedEvent event) {
         // Update order status
@@ -88,7 +89,7 @@ public class ChoreographyInventoryService {
         }
     }
 
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onShipmentFailed(ShipmentFailedEvent event) {
         Long reservationId = event.getReservationId();

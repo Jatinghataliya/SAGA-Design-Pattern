@@ -2,10 +2,11 @@ package com.saga.choreography.order;
 
 import com.saga.choreography.common.EventBus;
 import com.saga.choreography.commons.events.*;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.List;
 
@@ -52,7 +53,7 @@ public class ChoreographyOrderService {
         return orderRepository.findAll();
     }
 
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onOrderCompleted(OrderCompletedEvent event) {
         orderRepository.findById(event.getOrderId()).ifPresent(order -> {
@@ -62,21 +63,21 @@ public class ChoreographyOrderService {
         });
     }
 
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onPaymentFailed(PaymentFailedEvent event) {
         // Payment declined → order failed immediately
         eventBus.publish(new OrderFailedEvent(event.getOrderId(), event.getReason()));
     }
 
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onPaymentRefunded(PaymentRefundedEvent event) {
         // Payment was refunded after inventory/shipping failure → order failed
         eventBus.publish(new OrderFailedEvent(event.getOrderId(), event.getReason()));
     }
 
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onOrderFailed(OrderFailedEvent event) {
         orderRepository.findById(event.getOrderId()).ifPresent(order -> {

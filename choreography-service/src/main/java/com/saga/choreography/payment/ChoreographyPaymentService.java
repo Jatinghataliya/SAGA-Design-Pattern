@@ -4,7 +4,8 @@ import com.saga.choreography.common.EventBus;
 import com.saga.choreography.commons.events.*;
 import com.saga.choreography.order.ChoreographyOrderRepository;
 import com.saga.choreography.order.ChoreographyOrderStatus;
-import org.springframework.context.event.EventListener;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,7 +29,7 @@ public class ChoreographyPaymentService {
         this.eventBus = eventBus;
     }
 
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onOrderCreated(OrderCreatedEvent event) {
         // Update order status to PAYMENT_PROCESSING
@@ -71,13 +72,13 @@ public class ChoreographyPaymentService {
         }
     }
 
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onInventoryFailed(InventoryFailedEvent event) {
         refundPayment(event.getOrderId(), event.getPaymentId(), event.getReason());
     }
 
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onInventoryReleased(InventoryReleasedEvent event) {
         refundPayment(event.getOrderId(), event.getPaymentId(), event.getReason());

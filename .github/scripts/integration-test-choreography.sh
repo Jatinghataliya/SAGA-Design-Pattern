@@ -60,15 +60,16 @@ ORDER_ID=$(echo "$BODY" | grep -o '"id":[0-9]*' | head -1 | cut -d':' -f2)
 assert_contains "Happy path has order id" "$BODY" '"id"'
 
 # Give async event chain time to fully complete
-sleep 2
+sleep 5
 
-# ── Test 2: Poll order until COMPLETED (max 10s) ────────────────────────────
+# ── Test 2: Poll order until COMPLETED (max 30s) ────────────────────────────
 echo ""
 echo "--- Test 2: Poll until COMPLETED (orderId=$ORDER_ID) ---"
 FINAL_STATUS=""
-for i in $(seq 1 10); do
+for i in $(seq 1 30); do
   POLL=$(curl -s "$BASE/choreography/orders/$ORDER_ID")
   FINAL_STATUS=$(echo "$POLL" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+  echo "  poll $i: status=$FINAL_STATUS"
   if [ "$FINAL_STATUS" = "COMPLETED" ]; then
     break
   fi
@@ -78,7 +79,7 @@ if [ "$FINAL_STATUS" = "COMPLETED" ]; then
   echo "[PASS] Order eventually reached COMPLETED status"
   PASS=$((PASS + 1))
 else
-  echo "[FAIL] Order status after 10s: $FINAL_STATUS (expected COMPLETED)"
+  echo "[FAIL] Order status after 30s: $FINAL_STATUS (expected COMPLETED)"
   FAIL=$((FAIL + 1))
 fi
 
